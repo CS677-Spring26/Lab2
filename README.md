@@ -6,7 +6,7 @@ In Lab 1, you mastered local hardware control. Lab 2 shifts the focus to **Commu
 
 ---
 
-## Task 1: WiFi Based LED Control 
+## Task 1: WiFi Based LED Control (In-Lab)
 
 Before building the health monitor, you must understand how to turn the ESP32 into a web server that can be accessed by other devices on a Local Area Network (LAN).
 
@@ -93,7 +93,7 @@ Here is the revised section, focusing specifically on targeting the ESP32 and cl
 
 --- 
 
-## Task 2: Going Global (Remote Access)
+## Task 2: Going Global (Remote Access) (Take Home)
 
 Currently, your control only works if you are on the same WiFi. To control the LED from anywhere in the world (e.g., via 4G), you need a **Gateway** to the public internet. Since your ESP32 has a private local IP (unreachable from the outside), we will use your laptop as a gateway.
 
@@ -119,7 +119,7 @@ When a request hits the public URL, `ngrok` catches it on your laptop and "tunne
 
 ---
 
-## Task 3: Intelligent Health Monitoring
+## Task 3: Intelligent Health Monitoring (Take Home)
 
 Now you will combine the sensor, the internet, and AI to create a heart health monitor. You will use a sensor to read the heartbeat and blood oxygen level, pass this to a flask server that will forward it to an LLM. The LLM will give you a medical recommendation that you will send as a notification alert on your phone.
 
@@ -365,3 +365,9 @@ http.end();
 ```
 
 Add this code to your `loop()` function **after** calculating SpO2 and heart rate. Check Serial Monitor, to print and verify the response from the server.
+
+## Integration & Submission
+
+**Testing:** Place finger on sensor → ESP32 reads vitals → sends to Flask (via ngrok) → Gemini analyzes → ntfy notification appears on phone.
+
+**Submit:** Zip all code (ESP32 `.ino`, Flask `app.py`) as `G_<GroupNo>.zip` + video demo showing: sensor reading → Serial Monitor → ntfy notification received. Make sure all tasks are in separate folders within the zip file.
