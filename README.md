@@ -1,127 +1,179 @@
-# Lab 2: LLM Health Monitor
+# Lab 2: Communication and Networking
 
 ## Background
 
-In Lab 1, you mastered local hardware control. Lab 2 shifts the focus to **Distributed IoT Systems**. You will transform an ESP32 into an "Intelligent Health" device that captures biometric data and delegates the "thinking" to a Large Language Model (LLM) on a separate server.
-
-You will use a MAX30102 Pulse Oximeter to measure Heart Rate (BPM) and Blood Oxygen (SpO2). The sensor captures photoplethysmogram (PPG) data by shining Red and IR light through your finger. Instead of relying on rigid, pre-programmed thresholds to determine if a user is "healthy," you will stream these calculated vitals to a Gemini-powered server. The Large Language Model will "read" the biometrics, understand the context, and provide actionable medical recommendations or wellness advice.
+In Lab 1, you mastered local hardware control. Lab 2 shifts the focus to **Communication and Networking in IoT Systems**. You will start by controlling an LED through your mobile over WiFi, and then build an Intelligent Health device.
 
 ---
 
-## Task 1: The Local Gateway (Mobile Hotspot)
+## Task 1: WiFi Based LED Control 
 
-Your ESP32 and Laptop must be on the same "local wifi" to communicate. Because campus Wi-Fi blocks device-to-device talking, you will use a **Mobile Hotspot**. **Both** your Laptop and ESP32 must connect to the same phone hotspot. This puts them behind a single gateway.
+Before building the health monitor, you must understand how to turn the ESP32 into a web server that can be accessed by other devices on a Local Area Network (LAN).
 
-#### **ESP32 Wi-Fi Code**
+### **1. Creating a Local Area Network (LAN)**
 
-Add this to your sketch to join the network:
+Your ESP32 and Laptop must be on the same network to communicate directly.
+
+1. **Mobile Hotspot:** Create a hotspot with your phone.
+2. **Connect:** Connect **BOTH** your Laptop and the ESP32 to this hotspot.
+
+### **2. Connecting the ESP32-S3 to WiFi**
+
+This snippet handles the initial setup of the ESP32 hardware and establishes the connection to your mobile hotspot.
 
 ```cpp
 #include <WiFi.h>
 
-const char* ssid = "YOUR_HOTSPOT_NAME"; 
+const char* ssid = "YOUR_HOTSPOT_NAME";
 const char* password = "YOUR_PASSWORD";
+const int LED_PIN = 2; // Check your board's LED pin
 
 void setup() {
   Serial.begin(115200);
+  
+  // Connect to WiFi
   WiFi.begin(ssid, password);
   
+  // Wait for connection (Blocking Loop)
   while (WiFi.status() != WL_CONNECTED) { 
-    delay(500); Serial.print("."); 
+    delay(500); 
+    Serial.print("."); 
   }
-  Serial.println("\nConnected!");
+  
+  Serial.println("\nConnected! IP Address: ");
   Serial.println(WiFi.localIP()); 
+}
+
+void loop() {
+  // Nothing here yet
 }
 
 ```
 
-#### **The Ngrok Tunnel**
+**Test:** Open the Serial Monitor to find the ESP32's IP (e.g., `192.168.x.x`).
 
-1. **Download & Auth:** Ensure you have signed up at [ngrok.com](https://dashboard.ngrok.com/signup) and added your authtoken to your PC's terminal. (You are recommended to use choco if you are on Windows).
-2. **Start the Tunnel:** Run the following command in your terminal:
-`ngrok http 5000`
-3. **Copy the URL:** Look for the **Forwarding** line (e.g., `https://1234-abcd.ngrok-free.app`).
-* This is the "Public Address" of your laptop.
-* Any data the ESP32 sends to this URL will be forwarded to your Flask app running on port 5000 on your PC.
+### 3. Setting up a Web Page on the ESP32-S3
 
+Once connected, you add the `WebServer` logic to handle browser requests and toggle the LED.
 
+```cpp
+#include <WebServer.h>
+
+WebServer server(80); // Standard HTTP port
+
+// Toggle Handler
+void handleToggle() {
+    // Implement this
+}
+
+void setup() {
+  // ... (Previous WiFi setup code here) ...
+
+  // Define Server Routes
+  // 1. Root Page: Displays the button
+  server.on("/", []() {
+    server.send(200, "text/html", 
+      "<h1>ESP32 Control</h1><a href='/toggle'><button>Toggle LED</button></a>");
+  });
+  
+  // 2. Toggle Action: Handles the button click
+  server.on("/toggle", handleToggle);
+  
+  server.begin(); // Start the server
+}
+
+void loop() {
+  server.handleClient(); // Listen for incoming requests
+}
+
+```
+
+Finally, enter the ESP-32's IP in your laptop or phone browser. Make sure the laptop or phone is connected to the same hotspot. Clicking the button should toggle the LED.
+Here is the revised section, focusing specifically on targeting the ESP32 and clarifying the IP "Bridging" concept.
+
+--- 
+
+## Task 2: Going Global (Remote Access)
+
+Currently, your control only works if you are on the same WiFi. To control the LED from anywhere in the world (e.g., via 4G), you need a **Gateway** to the public internet. Since your ESP32 has a private local IP (unreachable from the outside), we will use your laptop as a gateway.
+
+### **The Laptop as a Tunnel**
+
+Think of your laptop as a translator between two worlds:
+
+1. **The Public Internet:** Your laptop runs `ngrok`, which generates a public URL (e.g., `https://random-name.ngrok-free.app`). Anyone on the internet can talk to this URL.
+2. **The Private LAN:** Your laptop is also connected to your local hotspot, so it can see the ESP32's private IP (e.g., `192.168.43.50`).
+
+When a request hits the public URL, `ngrok` catches it on your laptop and "tunnels" it directly to the ESP32's local IP. The ESP32 thinks the request came from your laptop, not the internet.
+
+### **The Ngrok Tunnel Setup**
+
+1. **Download:** Install ngrok from [ngrok.com](https://dashboard.ngrok.com/signup).
+2. **Identify:** Find your ESP32's IP address in the Serial Monitor (e.g., `192.168.1.50`).
+3. **Tunnel:** Open your terminal and run the command below. Replace the IP with your ESP32's actual IP:
+`ngrok http <ESP32_IP>:80` *Note: We use port `80` because we used it previously.*
+
+4. **URL:** Copy the forwarding URL (e.g., `https://1234-abcd.ngrok-free.app`).
+
+**Test:** Use your partner's phone (The one not connected to the hotspot). Connect to Wireless / LUMS-Events and try to open this URL. You should now be able to toggle the LED from anywhere!
 
 ---
 
-## Task 2: MAX30102 Sensor Setup & Sampling
+## Task 3: Intelligent Health Monitoring
 
-The ESP32 acts as an **HTTP Client**. It processes biometric data locally and "pushes" the results to the internet.
+Now you will combine the sensor, the internet, and AI to create a heart health monitor. You will use a sensor to read the heartbeat and blood oxygen level, pass this to a flask server that will forward it to an LLM. The LLM will give you a medical recommendation that you will send as a notification alert on your phone.
 
-#### **Hardware & Library Configuration**
+![Diagram](oxisetup.png)
 
-1. **Library Setup:** In the Arduino IDE, go to **Sketch > Include Library > Manage Libraries**. Search for and install **"SparkFun MAX3010x Pulse and Proximity Sensor Library"**. This library handles the low-level register communication.
-2. **I2C Pin Configuration:** The MAX30102 communicates via I2C (SDA/SCL). On the ESP32-S3, you must explicitly define which pins are used for I2C in your code, or the sensor will not be found.
-3. **Sensor Placement & Sensitivity:**
-* **Placement:** The sensor must be placed firmly against the fleshy part of your finger.
-* **Light Sensitivity:** The sensor measures light absorption. **Ambient light (sunlight or bright room lights) will corrupt the data.** Cover the sensor and your finger with a dark cloth or your other hand while reading.
-* **Stability:** Keep your hand still. Motion creates noise that ruins the BPM calculation.
+### **1. MAX30102 Sensor**
 
+The MAX30102 uses **Photoplethysmography (PPG)**. It shines Red (660nm) and Infrared (880nm) light into your finger to measure blood oxygen saturation and heart rate.
 
-
-#### **Sampling Logic & Calculations**
-
-To get an accurate reading, we cannot use a single instantaneous sample. We must average data over time.
-
-* **Buffer Length:** The standard algorithm requires a buffer of roughly **100 samples** (approx. 4 seconds of data) to detect peaks (heartbeats) and calculate the ratio of Red to IR light absorption (SpO2).
-* **Minimum Calculations:** You do not need to write the DSP math from scratch. The library includes a file `spo2_algorithm.h`. You will pass the raw Red and IR buffers to the function `maxim_heart_rate_and_oxygen_saturation()`, which computes the valid SpO2 and BPM for you.
-
-#### **Code Structure (`HTTP POST`)**
+1. **Library:** Install **"SparkFun MAX3010x Pulse and Proximity Sensor Library"**.
+2. **Wiring:** Connect the sensor via I2C (SDA/SCL) to your ESP32. You may use ``Wire.begin(sda, scl)`` to reconfigure the pins or refer to the ESP32-S3 pin out to see which pins are SDA and SCL by default. 
+3. **Sampling:** Collect a buffer of atleast 100 samples (approx. 4 seconds) to calculate accurate averages.
 
 ```cpp
-#include <WiFi.h>
-#include <HTTPClient.h>
-#include <Wire.h>
 #include "MAX30105.h"
-#include "spo2_algorithm.h" // Ensure this file is in your project folder
+#include "spo2_algorithm.h"
 
 MAX30105 particleSensor;
 
-// Pin Definitions for ESP32-S3 (Check your specific board pinout!)
-#define I2C_SDA 42 
-#define I2C_SCL 41
-
 // Buffer setup
-#define MAX_BRIGHTNESS 255
 uint32_t irBuffer[100]; // Infrared LED sensor data
 uint32_t redBuffer[100];  // Red LED sensor data
 int32_t bufferLength = 100; // Data length
-int32_t spo2; // Calculated SpO2
-int8_t validSPO2; // Indicator to show if value is valid
-int32_t heartRate; // Calculated heart rate
-int8_t validHeartRate; // Indicator to show if value is valid
 
-const char* proxyUrl = "https://your-ngrok-url.ngrok-free.app/recommend";
+// Output variables
+int32_t spo2; 
+int8_t validSPO2; 
+int32_t heartRate; 
+int8_t validHeartRate;
 
 void setup() {
-  Serial.begin(115200);
-  // ... (WiFi setup from Task 1) ...
+  ...
 
-  // Initialize I2C with specific pins
-  Wire.begin(I2C_SDA, I2C_SCL);
-
+  // Initialize Sensor
   if (!particleSensor.begin(Wire, I2C_SPEED_FAST)) {
     Serial.println("MAX30102 was not found. Please check wiring/power.");
     while (1);
   }
 
   // Sensor Configuration
-  byte ledBrightness = 60; // Options: 0=Off to 255=50mA
-  byte sampleAverage = 4; // Options: 1, 2, 4, 8, 16, 32
-  byte ledMode = 2; // Options: 1 = Red only, 2 = Red + IR, 3 = Red + IR + Green
-  byte sampleRate = 100; // Options: 50, 100, 200, 400, 800, 1000, 1600, 3200
-  int pulseWidth = 411; // Options: 69, 118, 215, 411
-  int adcRange = 4096; // Options: 2048, 4096, 8192, 16384
-
-  particleSensor.setup(ledBrightness, sampleAverage, ledMode, sampleRate, pulseWidth, adcRange);
+  // brightness: 0=Off to 255=50mA
+  // sampleAverage: 4
+  // ledMode: 2 (Red + IR)
+  // sampleRate: 100 (Samples per second)
+  // pulseWidth: 411
+  // adcRange: 4096
+  particleSensor.setup(60, 4, 2, 100, 411, 4096); 
+  
+  Serial.println("Sensor Initialized. Place your finger on the sensor.");
 }
 
 void loop() {
   // 1. Collect 100 samples (approx 4 seconds)
+  // This loop blocks until the buffer is full
   for (byte i = 0 ; i < bufferLength ; i++) {
     while (particleSensor.available() == false) 
       particleSensor.check(); // Check the sensor for new data
@@ -132,69 +184,88 @@ void loop() {
   }
 
   // 2. Calculate SpO2 and Heartrate using library algorithm
+  // This function processes the raw data in the buffer
   maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
 
-  // 3. Only send if data is valid
+  // 3. Print Results
   if (validSPO2 == 1 && validHeartRate == 1) {
-    String jsonPayload = "{\"spo2\": " + String(spo2) + ", \"bpm\": " + String(heartRate) + "}";
+    Serial.print("Heart Rate: ");
+    Serial.print(heartRate);
+    Serial.print(" BPM");
     
-    HTTPClient http;
-    http.begin(proxyUrl);
-    http.addHeader("Content-Type", "application/json");
-    int httpResponseCode = http.POST(jsonPayload);
-    
-    if (httpResponseCode > 0) {
-      Serial.println("AI Advice: " + http.getString());
-    }
-    http.end();
+    Serial.print("\t SpO2: ");
+    Serial.print(spo2);
+    Serial.println(" %");
   } else {
-    Serial.println("Reading failed. Please adjust finger position.");
+    Serial.println("Reading failed. Please adjust finger position and keep still.");
   }
 }
+```
+
+### **2. Flask Server**
+
+You will write a Flask server (`app.py`) that acts as the controller between your ESP32 and the Gemini Server. This server receives the SpO2 and BPM data from your ESP, consults Gemini, and publishes medical recommendations to your mobile phone.
+
+#### **Initial Setup & File Navigation**
+
+1. **Install Flask:** Open your terminal or command prompt and install the necessary libraries:
+```bash
+pip install flask google-generativeai requests
 
 ```
 
----
 
-## Task 3: The Gemini AI Proxy Server
+2. **Create Project Folder:** Create a new folder on your Desktop named `Health_Server`.
+3. **Create the File:** Inside that folder, create a new text file and name it `app.py`. (Make sure the extension is `.py`, not `.txt`).
+4. **Open in Editor:** Right-click the folder and open it in VS Code (or your preferred editor). You should see `app.py` in the file explorer on the left.
 
-You will write a Flask server (`app.py`) that acts as the bridge between your ESP32 and the Gemini Servers. This server receives the SpO2 and BPM data, consults Gemini, and sends medical recommendations back to the microcontroller.
 
-#### **1. Create the Flask HTTP Endpoint**
 
-Define a route to receive the data and return the AI's response directly to the ESP32.
+#### **Create the Flask HTTP Endpoint**
+
+Define a route to receive the data. This function triggers whenever the ESP32 sends a POST request to `/recommend`.
 
 ```python
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
 @app.route('/recommend', methods=['POST'])
 def recommend_health():
     sensor_data = request.json  # Extract JSON (spo2 and bpm) from ESP32
-    # ... (AI Logic below) ...
+    # ... (AI Logic will go here) ...
     return response.text, 200   # Sends the recommendation back to the ESP32
 
+if __name__ == '__main__': 
+    app.run()
+
 ```
 
-#### **2. Configure Structured JSON Output**
+#### **Setup Gemini API**
 
-Use Gemini's JSON mode to ensure the AI returns a parseable object instead of a long sentence.
+Go to [Google AI Studio](https://aistudio.google.com/) and create your API Key. You can then setup your Gemini model.
 
 ```python
+import google.generativeai as genai
+genai.configure(api_key="YOUR API KEY")
+
 generation_config = {"temperature": 0.1, "response_mime_type": "application/json"}
-model = genai.GenerativeModel("gemini-1.5-flash", generation_config=generation_config)
+model = genai.GenerativeModel("gemini-2.5-flash", generation_config=generation_config)
 
 ```
 
-#### **3. Define the Medical Prompt**
+**Define the Medical Prompt**
 
-Instruct the AI to evaluate the vitals and provide a short, actionable recommendation.
+Instruct the AI to evaluate the vitals and provide a short, actionable recommendation based on the data received.
 
 ```python
 prompt = f"Analyze these vitals. Return JSON: {{'status': 'HEALTH_STATUS', 'recommendation': 'SHORT_ADVICE'}}. Data: {sensor_data}"
 
 ```
 
-#### **4. Execute and Print Results**
+**Execute and Print Results**
 
-Call the model and send the final result to your ESP32-S3 as a response. The ESP32-S3 should print the advice on its serial monitor.
+Call the model and print the result to your computer's terminal to verify that it is working.
 
 ```python
 response = model.generate_content(prompt)
@@ -202,17 +273,95 @@ print(f"Gemini Recommendation: {response.text}")
 
 ```
 
-#### **5. Running the Proxy Server**
+#### **Running the Server**
 
-Start the Server: Execute your script using `python app.py` and ensure the terminal displays **Running on [http://0.0.0.0:5000**](http://0.0.0.0:5000) before placing your finger on the sensor.
+Once your pipeline is ready, you need to start the server to listen for connections.
 
-### **System Verification**
+1. **Run the Command:** inside your VS Code terminal (ensure you are in the `Health_Server` folder), type:
+```bash
+python app.py
 
-Once both the Python script and the ESP32 code are running, you should see the following flow:
+```
 
-1. **Sense:** You place your finger on the MAX30102 for ~4 seconds.
-2. **Push:** The ESP32 calculates SpO2/BPM and sends the data (e.g., `{"spo2": 98, "bpm": 75}`).
-3. **Think:** Your Python terminal prints `Gemini Recommendation: {"status": "Normal", "recommendation": "Vitals look good. Maintain hydration."}`.
-4. **Result:** The ESP32 receives that text and prints `AI Advice: ...` to its own Serial Monitor.
+*(If that doesn't work, try `python3 app.py`)*
 
----
+2. **Check the Output:** You should see a message indicating the server is running. It will look like this:
+```text
+ * Running on http://127.0.0.1:5000
+
+```
+
+
+* **127.0.0.1** is your "localhost" (your computer's internal address).
+* **5000** is the **Port Number**.
+
+
+#### Exposing the Server via Ngrok
+
+You will use this address and port number (5000) to set up a new Ngrok tunnel for your LAPTOP's server. This will allow your ESP32-S3 to access this server from anywhere on the internet.
+
+To elaborate on the `ntfy` integration, here is the detailed breakdown including the Python code snippet you need to add to your Flask server.
+
+### **3. Mobile Notification Setup (ntfy)**
+
+We need to send the LLM advice from your Flask Server to your mobile phone as a real time alert. We will use **ntfy.sh** for this. It is a simple, HTTP-based notification service that allows you to send push notifications to your phone without writing a custom mobile app. 
+
+**Step-by-Step Setup:**
+
+1. **Download the App:** Install the **ntfy** app (available on iOS and Android) on your phone.
+2. **Choose a Topic:** Pick a unique topic name (e.g., `health_monitor_abdullah`).
+* *Note: Topics are public. If you pick a common name like "test", you will see notifications from random people. Choose something unique!*
+
+
+3. **Subscribe:** Open the app, click the **+** button, and type in your chosen topic name. You are now listening for alerts.
+4. **The Mechanism:** To send an alert, your Python server simply sends a "POST" request to `https://ntfy.sh/YOUR_TOPIC_NAME`. The body of that request becomes the notification text.
+
+```python
+import requests
+NTFY_TOPIC = "medical_alerts_yourname" # CHANGE THIS to your unique topic!
+message = "Hello World"
+try:
+    requests.post(f"https://ntfy.sh/{NTFY_TOPIC}", 
+        data=message.encode(encoding='utf-8'))
+except Exception as e:
+    print(f"Error sending notification: {e}")
+
+```
+
+### 4. Making HTTP Requests from ESP32-S3
+
+Once connected to WiFi, your ESP32 can act as a **Web Client** - just like a browser. Instead of displaying web pages, it can send data to servers and receive responses. This is how your ESP32 will communicate with your Flask server.
+
+1. **Format the Payload:** Package your sensor data as a JSON string (e.g., `{"spo2": 98, "bpm": 72}`)
+2. **Set Headers:** Tell the server you're sending JSON data (`Content-Type: application/json`)
+3. **Execute POST Request:** Send the data and receive a response
+4. **Clean Up:** Always free resources when done
+
+```cpp
+#include <HTTPClient.h>
+
+// Create payload (JSON string)
+String payload = "{\"spo2\":" + String(spo2) + ",\"bpm\":" + String(heartRate) + "}";
+
+// Initialize HTTP client
+HTTPClient http;
+http.begin("YOUR_NGROK_URL_HERE/recommend");  // Replace with your ngrok URL
+http.addHeader("Content-Type", "application/json");
+
+// Send POST request
+int httpResponseCode = http.POST(payload);
+
+// Check response
+if (httpResponseCode > 0) {
+  String response = http.getString();  // Get the AI recommendation
+  Serial.println("Server Response: " + response);
+} else {
+  Serial.print("Error on sending POST: ");
+  Serial.println(httpResponseCode);
+}
+
+// Always free resources
+http.end();
+```
+
+Add this code to your `loop()` function **after** calculating SpO2 and heart rate. Check Serial Monitor, to print and verify the response from the server.
