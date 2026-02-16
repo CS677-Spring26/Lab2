@@ -8,7 +8,7 @@ In Lab 1, you mastered local hardware control. Lab 2 shifts the focus to **Commu
 
 ## Task 1: WiFi Based LED Control (In-Lab)
 
-Before building the health monitor, you must understand how to turn the ESP32 into a web server that can be accessed by other devices on a Local Area Network (LAN).
+Your goal is to turn the ESP32 into a web server that can be accessed by other devices on a Local Area Network (LAN). This will allow us to send an HTTP request to the ESP32 over WiFi and get it to toggle an LED ON and OFF.
 
 ### **1. Creating a Local Area Network (LAN)**
 
@@ -95,7 +95,7 @@ Here is the revised section, focusing specifically on targeting the ESP32 and cl
 
 ## Task 2: Going Global (Remote Access) (Take Home)
 
-Currently, your control only works if you are on the same WiFi. To control the LED from anywhere in the world (e.g., via 4G), you need a **Gateway** to the public internet. Since your ESP32 has a private local IP (unreachable from the outside), we will use your laptop as a gateway.
+Currently, your LED control only works if your Client and Server are on the same WiFi. To control the LED from anywhere in the world (e.g., via 4G), you need a **Gateway** to the public internet. Since your ESP32 has a private local IP (unreachable from the outside), we will use your laptop as a gateway. The goal is to be able to toggle the LED from anywhere on earth.
 
 ### **The Laptop as a Tunnel**
 
@@ -115,7 +115,7 @@ When a request hits the public URL, `ngrok` catches it on your laptop and "tunne
 
 4. **URL:** Copy the forwarding URL (e.g., `https://1234-abcd.ngrok-free.app`).
 
-**Test:** Use your partner's phone (The one not connected to the hotspot). Connect to Wireless / LUMS-Events and try to open this URL. You should now be able to toggle the LED from anywhere!
+**Test:** Use your partner's phone (The one not connected to the hotspot). Connect it to Wireless / LUMS-Events and try to open this URL. You should now be able to toggle the LED from anywhere! You only need to submit a video demo for this part.
 
 ---
 
