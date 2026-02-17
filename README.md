@@ -93,7 +93,7 @@ Here is the revised section, focusing specifically on targeting the ESP32 and cl
 
 --- 
 
-## Task 2: Going Global (Remote Access) (Take Home)
+## Task 2: Going Global (Remote Access) (In Lab)
 
 Currently, your LED control only works if your Client and Server are on the same WiFi. To control the LED from anywhere in the world (e.g., via 4G), you need a **Gateway** to the public internet. Since your ESP32 has a private local IP (unreachable from the outside), we will use your laptop as a gateway. The goal is to be able to toggle the LED from anywhere on earth.
 
